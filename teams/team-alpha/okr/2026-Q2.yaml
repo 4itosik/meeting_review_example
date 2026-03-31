@@ -1,0 +1,69 @@
+quarter: 2026-Q2
+period: 2026-04-01 — 2026-06-30
+updated: 2026-03-31
+
+# Статусы: not_started, on_track, at_risk, done, dropped
+# Progress: 0–100
+
+team_okrs:
+ - objective: "Запустить платежный модуль в прод"
+   key_results:
+    - kr: "Все платежные сценарии покрыты e2e тестами"
+      progress: 40
+      status: on_track
+    - kr: "0 критических багов на staging в течение 5 дней"
+      progress: 20
+      status: on_track
+    - kr: "Релиз в прод до 15 мая"
+      progress: 0
+      status: not_started
+
+ - objective: "Снизить время отклика API до p99 < 200ms"
+   key_results:
+    - kr: "Профилирование и устранение top-3 узких мест"
+      progress: 10
+      status: at_risk
+    - kr: "Дашборд с p95/p99 метриками в Grafana"
+      progress: 0
+      status: not_started
+
+personal_okrs:
+ Иван:
+  - objective: "Стать владельцем интеграционного слоя"
+    key_results:
+     - kr: "Задокументировать все API-контракты с CRM"
+       progress: 30
+       status: on_track
+     - kr: "Реализовать идемпотентность для всех callback-эндпоинтов"
+       progress: 0
+       status: not_started
+
+ Мария:
+  - objective: "Повысить качество UI-компонентов"
+    key_results:
+     - kr: "Покрыть все формы unit-тестами (>80%)"
+       progress: 20
+       status: on_track
+     - kr: "Внедрить Storybook для компонентов платежного модуля"
+       progress: 0
+       status: not_started
+
+ Петр:
+  - objective: "Построить observability для billing"
+    key_results:
+     - kr: "Дашборд p95/p99 по всем эндпоинтам billing"
+       progress: 0
+       status: not_started
+     - kr: "Алерты на деградацию >20% от baseline"
+       progress: 0
+       status: not_started
+
+ Алина:
+  - objective: "Стабилизировать e2e-тестирование"
+    key_results:
+     - kr: "Flaky rate < 5% за квартал"
+       progress: 15
+       status: on_track
+     - kr: "Smoke suite проходит за < 10 минут"
+       progress: 30
+       status: on_track

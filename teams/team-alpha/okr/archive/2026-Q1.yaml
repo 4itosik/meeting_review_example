@@ -1,0 +1,38 @@
+quarter: 2026-Q1
+period: 2026-01-01 — 2026-03-31
+closed: 2026-03-31
+updated: 2026-03-31
+
+team_okrs:
+ - objective: "Построить MVP платежного модуля"
+   key_results:
+    - kr: "Базовый платежный флоу работает на staging"
+      progress: 100
+      status: done
+    - kr: "Интеграция с платежным провайдером"
+      progress: 80
+      status: at_risk
+    - kr: "Базовые e2e тесты для платежей"
+      progress: 70
+      status: at_risk
+
+personal_okrs:
+ Иван:
+  - objective: "Освоить интеграционные паттерны"
+    key_results:
+     - kr: "Реализовать retry/webhook механизм"
+       progress: 100
+       status: done
+     - kr: "Написать RFC по идемпотентности"
+       progress: 50
+       status: at_risk
+
+ Петр:
+  - objective: "Настроить billing-инфраструктуру"
+    key_results:
+     - kr: "Миграции БД для billing"
+       progress: 100
+       status: done
+     - kr: "Базовые метрики billing"
+       progress: 30
+       status: at_risk

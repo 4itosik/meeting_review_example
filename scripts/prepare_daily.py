@@ -8,6 +8,7 @@ Collects context from previous meetings:
 - Yesterday's plans (todo) per person
 - Speaking order rotation
 - Board status from last meeting
+- Team context: roles, OKR at risk, lead notes
 
 Usage:
  python3 scripts/prepare_daily.py --team team-alpha [--date 2026-03-31]
@@ -18,7 +19,14 @@ import sys
 from datetime import date
 from pathlib import Path
 
+try:
+    import yaml
+    HAS_YAML = True
+except ImportError:
+    HAS_YAML = False
+
 MEETINGS_DIR = Path(__file__).resolve().parent.parent / "meetings"
+TEAMS_DIR = Path(__file__).resolve().parent.parent / "teams"
 
 
 def find_meetings(team: str, before_date: date | None = None, limit: int = 10) -> list[dict]:
@@ -38,7 +46,6 @@ def find_meetings(team: str, before_date: date | None = None, limit: int = 10) -
 
 def collect_open_action_items(meetings: list[dict]) -> list[dict]:
     """Collect action items that are still open across all previous meetings."""
-    # Gather all tasks mentioned as done in later meetings
     all_done_texts = set()
     for m in meetings:
         for upd in m["data"].get("updates", []):
@@ -55,7 +62,6 @@ def collect_open_action_items(meetings: list[dict]) -> list[dict]:
             if task_key in seen_tasks:
                 continue
             seen_tasks.add(task_key)
-            # Check if task was resolved in a done entry
             resolved = any(
                 task_key in done_text or done_text in task_key
                 for done_text in all_done_texts
@@ -73,12 +79,11 @@ def collect_open_action_items(meetings: list[dict]) -> list[dict]:
 
 def collect_recurring_blockers(meetings: list[dict]) -> list[dict]:
     """Find blockers that appear in multiple meetings."""
-    blocker_history: dict[str, list[str]] = {}  # normalized text -> list of dates
+    blocker_history: dict[str, list[str]] = {}
     for m in meetings:
         for upd in m["data"].get("updates", []):
             for b in upd.get("blockers", []):
                 b_lower = b.lower()
-                # Simple dedup: check if similar blocker already tracked
                 matched = False
                 for key in blocker_history:
                     common = set(key.split()) & set(b_lower.split())
@@ -119,10 +124,7 @@ def get_speaking_order(meetings: list[dict], participants: list[str]) -> list[st
     """Rotate speaking order based on previous meeting count."""
     if not participants:
         return []
-    # Simple rotation: shift by number of past meetings
     n = len(meetings)
-    # Separate lead (last speaker) from others
-    # Assume first participant in most recent meeting is the lead
     if not meetings:
         return participants
     last_participants = meetings[0]["data"].get("participants", participants)
@@ -136,6 +138,32 @@ def get_speaking_order(meetings: list[dict], participants: list[str]) -> list[st
     return others + [lead]
 
 
+def load_team_context(team: str) -> dict | None:
+    """Load team.yaml, current OKR, and lead notes."""
+    if not HAS_YAML:
+        return None
+    team_yaml = TEAMS_DIR / team / "team.yaml"
+    if not team_yaml.exists():
+        return None
+    config = yaml.safe_load(team_yaml.read_text(encoding="utf-8"))
+
+    ctx = {"config": config, "okr": None, "notes": None}
+
+    okr_rel = config.get("current_okr")
+    if okr_rel:
+        okr_path = TEAMS_DIR / team / okr_rel
+        if okr_path.exists():
+            ctx["okr"] = yaml.safe_load(okr_path.read_text(encoding="utf-8"))
+
+    notes_rel = config.get("lead_notes")
+    if notes_rel:
+        notes_path = TEAMS_DIR / team / notes_rel
+        if notes_path.exists():
+            ctx["notes"] = notes_path.read_text(encoding="utf-8")
+
+    return ctx
+
+
 def format_briefing(
     team: str,
     target_date: date,
@@ -144,26 +172,55 @@ def format_briefing(
     plans: list[dict],
     last_summary: str | None,
     speaking_order: list[str],
+    team_ctx: dict | None = None,
 ) -> str:
     lines = []
     lines.append(f"# Daily Briefing — {target_date} — {team}")
     lines.append("")
+
+    # Team roles
+    if team_ctx and team_ctx.get("config"):
+        members = team_ctx["config"].get("members", [])
+        if members:
+            lines.append("## Команда")
+            for m in members:
+                lines.append(f"- {m['name']}: {m.get('role', '')} ({m.get('focus', '')})")
+            lines.append("")
 
     # Speaking order
     if speaking_order:
         lines.append("## Порядок выступлений")
         for i, name in enumerate(speaking_order, 1):
             suffix = " (тимлид, последний)" if i == len(speaking_order) else ""
-            lines.append(f" {i}. {name}{suffix}")
+            lines.append(f"{i}. {name}{suffix}")
         lines.append("")
+
+    # OKR at risk
+    if team_ctx and team_ctx.get("okr"):
+        okr = team_ctx["okr"]
+        at_risk = []
+        for obj in okr.get("team_okrs", []):
+            for kr in obj.get("key_results", []):
+                if kr.get("status") == "at_risk":
+                    at_risk.append(f"{kr['kr']} ({kr.get('progress', 0)}%)")
+        for person, objs in okr.get("personal_okrs", {}).items():
+            for obj in objs:
+                for kr in obj.get("key_results", []):
+                    if kr.get("status") == "at_risk":
+                        at_risk.append(f"[{person}] {kr['kr']} ({kr.get('progress', 0)}%)")
+        if at_risk:
+            lines.append(f"## OKR at risk ({len(at_risk)})")
+            for item in at_risk:
+                lines.append(f"- {item}")
+            lines.append("")
 
     # Yesterday's plans
     if plans:
         lines.append("## Что планировали на вчера")
         for p in plans:
-            lines.append(f" {p['person']}:")
+            lines.append(f"- {p['person']}:")
             for task in p["planned"]:
-                lines.append(f" - {task}")
+                lines.append(f"  - {task}")
         lines.append("")
 
     # Open action items
@@ -173,11 +230,11 @@ def format_briefing(
             age = f", {ai['age_days']}д назад" if ai["age_days"] > 0 else ""
             due = f", срок {ai['due_date']}" if ai["due_date"] else ""
             owner = ai["owner"] or "без владельца"
-            lines.append(f" - [{owner}] {ai['task']} (создано {ai['created']}{age}{due})")
+            lines.append(f"- [{owner}] {ai['task']} (создано {ai['created']}{age}{due})")
         lines.append("")
     else:
         lines.append("## Открытые поручения")
-        lines.append(" Нет открытых поручений.")
+        lines.append("- Нет открытых поручений.")
         lines.append("")
 
     # Recurring blockers
@@ -185,13 +242,19 @@ def format_briefing(
         lines.append(f"## Повторяющиеся блокеры ({len(recurring_blockers)})")
         for rb in recurring_blockers:
             dates_str = ", ".join(rb["dates"])
-            lines.append(f" - {rb['blocker']} (встречался: {dates_str})")
+            lines.append(f"- {rb['blocker']} (встречался: {dates_str})")
         lines.append("")
 
     # Last summary
     if last_summary:
         lines.append("## Контекст (последний дейлик)")
-        lines.append(f" {last_summary}")
+        lines.append(f"- {last_summary}")
+        lines.append("")
+
+    # Lead notes (private)
+    if team_ctx and team_ctx.get("notes"):
+        lines.append("## Заметки тимлида (приватно)")
+        lines.append(team_ctx["notes"].strip())
         lines.append("")
 
     return "\n".join(lines)
@@ -206,9 +269,25 @@ def main():
 
     target_date = date.fromisoformat(args.date) if args.date else date.today()
 
+    # Load team context (roles, OKR, notes)
+    team_ctx = load_team_context(args.team)
+
     meetings = find_meetings(args.team, before_date=target_date, limit=args.history)
     if not meetings:
-        print(f"No previous meetings found for {args.team} before {target_date}")
+        if team_ctx:
+            briefing = format_briefing(
+                team=args.team,
+                target_date=target_date,
+                open_items=[],
+                recurring_blockers=[],
+                plans=[],
+                last_summary=None,
+                speaking_order=[],
+                team_ctx=team_ctx,
+            )
+            print(briefing)
+        else:
+            print(f"No previous meetings found for {args.team} before {target_date}")
         sys.exit(0)
 
     open_items = collect_open_action_items(meetings)
@@ -226,6 +305,7 @@ def main():
         plans=plans,
         last_summary=last_summary,
         speaking_order=speaking_order,
+        team_ctx=team_ctx,
     )
     print(briefing)
 
