@@ -50,6 +50,16 @@ def check_rules(data: dict, raw_text: str = ""):
         if not data.get(key):
             errors.append(f"Missing required value: {key}")
 
+    # Rule: action item owner not in participants list
+    participants = set(data.get("participants", []))
+    for i, item in enumerate(data.get("action_items", []), start=1):
+        owner = item.get("owner")
+        if owner and owner not in participants:
+            warnings.append(
+                f"Action item #{i} owner '{owner}' is not in participants: "
+                f"{item.get('task', '<no-task>')}"
+            )
+
     return errors, warnings
 
 
