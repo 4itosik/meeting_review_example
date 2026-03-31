@@ -1,0 +1,42 @@
+{
+  "meeting_id": "2026-03-24-team-alpha",
+  "date": "2026-03-24",
+  "timezone": "Europe/Moscow",
+  "team": "team-alpha",
+  "participants": ["Иван", "Мария", "Пётр"],
+  "summary": "Статус задач по API и биллингу, блокер по ревью, перенос релиза на пятницу",
+  "updates": [
+    {
+      "person": "Иван",
+      "done": ["Закрыл TASK-101", "Открыл PR #88"],
+      "todo": [],
+      "blockers": [],
+      "notes": []
+    },
+    {
+      "person": "Мария",
+      "done": [],
+      "todo": [],
+      "blockers": ["Ждёт ревью по TASK-103"],
+      "notes": []
+    },
+    {
+      "person": "Пётр",
+      "done": [],
+      "todo": ["Взять TASK-110 по биллингу"],
+      "blockers": [],
+      "notes": []
+    }
+  ],
+  "decisions": ["Релиз перенесён на пятницу"],
+  "action_items": [
+    {
+      "task": "Назначить ревьюера для TASK-103",
+      "owner": null,
+      "status": "open",
+      "due_date": null
+    }
+  ],
+  "topics": ["API", "Биллинг", "Релиз"],
+  "offtopic": ["Обсуждение корпоратива"]
+}

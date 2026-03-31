@@ -1,0 +1,35 @@
+{
+  "meeting_id": "2026-03-23-team-alpha",
+  "date": "2026-03-23",
+  "timezone": "Europe/Moscow",
+  "team": "team-alpha",
+  "participants": ["Иван", "Мария"],
+  "summary": "Обсуждение API и перенос релиза",
+  "updates": [
+    {
+      "person": "Иван",
+      "done": ["Сделал API"],
+      "todo": ["Доработать API"],
+      "blockers": ["Нет доступа к тестовому сервису"],
+      "notes": []
+    },
+    {
+      "person": "Мария",
+      "done": ["Проверила макеты"],
+      "todo": ["Передать комментарии"],
+      "blockers": [],
+      "notes": []
+    }
+  ],
+  "decisions": ["Перенос релиза"],
+  "action_items": [
+    {
+      "task": "Выдать доступ к тестовому сервису Ивану",
+      "owner": null,
+      "status": "open",
+      "due_date": null
+    }
+  ],
+  "topics": ["API", "Релиз"],
+  "offtopic": []
+}
