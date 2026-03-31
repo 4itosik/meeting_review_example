@@ -45,7 +45,24 @@ description: >
   - `--month 2026-03`
   - `--from 2026-03-24 --to 2026-03-31` (произвольный диапазон)
 
-### Шаг 2: Запустить оба скрипта
+### Шаг 2: Подтянуть team context из `team.yaml`
+
+Перед запуском `generate_review.py` и `generate_insights.py` прочитай:
+
+- `teams/<team>/team.yaml`
+- `teams/<team>/<current_okr>` (через поле `current_okr`)
+- `teams/<team>/lead-notes.md` (если есть и если отчёт внутренний)
+
+Используй это как контекст для интерпретации insights:
+- роли/зоны ответственности участников
+- OKR со статусом `at_risk` и связь с блокерами периода
+- приоритеты тимлида (только для внутренней версии отчёта)
+
+Ограничения:
+- факты периода берутся только из `meetings/*/structured.json`
+- `team.yaml` и OKR не добавляют новые “события”, а только контекст для выводов
+
+### Шаг 3: Запустить оба скрипта
 
 ```bash
 python3 scripts/generate_review.py --team TEAM_NAME --week YYYY-Www [--save]
@@ -58,7 +75,7 @@ python3 scripts/generate_insights.py --team TEAM_NAME --week YYYY-Www [--save]
 - `2026-W13-team-alpha.md` — обзор
 - `2026-W13-team-alpha-insights.md` — выводы
 
-### Шаг 3: Показать результат
+### Шаг 4: Показать результат
 
 Выведи оба документа пользователю. Обрати внимание:
 
@@ -66,7 +83,7 @@ python3 scripts/generate_insights.py --team TEAM_NAME --week YYYY-Www [--save]
 - Системные блокеры — предложи вынести в отдельный созвон
 - Если insights пуст (“Значимых паттернов не обнаружено”) — скажи об этом
 
-### Шаг 4: Подготовить тексты для отправки
+### Шаг 5: Подготовить тексты для отправки
 
 Прочитай промпт `prompts/format_report.md`. Подставь в него:
 
