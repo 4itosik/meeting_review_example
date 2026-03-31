@@ -35,5 +35,13 @@
 1. Создать папку встречи
 2. Добавить `raw.md`
 3. Сгенерировать `summary.md` и `structured.json`
-4. При необходимости добавить `notes.md`
-5. Использовать weekly/monthly шаблоны для обзоров
+4. Прогнать проверку регламента
+5. При необходимости добавить `notes.md`
+6. Использовать weekly/monthly шаблоны для обзоров
+
+Проверка регламента:
+```bash
+python3 scripts/check_protocol.py \
+  --structured meetings/YYYY/MM/YYYY-MM-DD-team-name/structured.json \
+  --raw meetings/YYYY/MM/YYYY-MM-DD-team-name/raw.md
+```
