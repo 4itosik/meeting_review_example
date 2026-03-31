@@ -1,0 +1,64 @@
+{
+  "meeting_id": "2026-03-28-team-alpha",
+  "date": "2026-03-28",
+  "timezone": "Europe/Moscow",
+  "team": "team-alpha",
+  "participants": ["Артем", "Иван", "Мария", "Петр", "Алина"],
+  "summary": "Подготовка к релизу. Два блокера: ответ от дизайнера и нестабильный тестовый стенд.",
+  "updates": [
+    {
+      "person": "Иван",
+      "done": ["Закрыл TASK-235 (retry logic)"],
+      "todo": ["TASK-241 (ретраи вебхуков)"],
+      "blockers": [],
+      "notes": []
+    },
+    {
+      "person": "Мария",
+      "done": ["TASK-230 (UI макеты) в ревью"],
+      "todo": ["TASK-233 (UI статусов оплаты)"],
+      "blockers": ["Ожидает ответ от дизайнера по цветовой схеме"],
+      "notes": []
+    },
+    {
+      "person": "Петр",
+      "done": ["TASK-236 (индексы БД)"],
+      "todo": ["TASK-238 (миграции billing)"],
+      "blockers": [],
+      "notes": []
+    },
+    {
+      "person": "Алина",
+      "done": ["Написала TASK-240 (smoke-тесты)"],
+      "todo": ["TASK-245 (e2e smoke)"],
+      "blockers": ["Тестовый стенд нестабилен"],
+      "notes": []
+    },
+    {
+      "person": "Артем",
+      "done": [],
+      "todo": ["Связаться с DevOps по тестовому стенду"],
+      "blockers": [],
+      "notes": []
+    }
+  ],
+  "decisions": [
+    "DevOps починят тестовый стенд до конца дня"
+  ],
+  "action_items": [
+    {
+      "task": "Починить тестовый стенд",
+      "owner": "Олег",
+      "status": "open",
+      "due_date": "2026-03-28"
+    },
+    {
+      "task": "Получить ответ от дизайнера по цветовой схеме",
+      "owner": "Артем",
+      "status": "open",
+      "due_date": null
+    }
+  ],
+  "topics": ["Релиз", "UI", "Тестирование"],
+  "offtopic": []
+}

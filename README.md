@@ -42,6 +42,22 @@
 Проверка регламента:
 ```bash
 python3 scripts/check_protocol.py \
-  --structured meetings/YYYY/MM/YYYY-MM-DD-team-name/structured.json \
-  --raw meetings/YYYY/MM/YYYY-MM-DD-team-name/raw.md
+ --structured meetings/YYYY/MM/YYYY-MM-DD-team-name/structured.json \
+ --raw meetings/YYYY/MM/YYYY-MM-DD-team-name/raw.md
 ```
+
+Подготовка к дейлику:
+```bash
+python3 scripts/prepare_daily.py --team team-alpha [--date 2026-03-31]
+```
+
+## Claude Code Skills
+
+- docs/skills/process-daily/ — обработка транскрипции дейлика (raw → summary + json + валидация)
+- docs/skills/prepare-daily/ — подготовка брифинга перед дейликом
+
+## Зависимости
+```bash
+pip install jsonschema
+```
+---
