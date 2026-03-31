@@ -54,17 +54,17 @@ python3 scripts/prepare_daily.py --team team-alpha [--date 2026-03-31]
 Обзор за неделю/месяц:
 ```bash
 python3 scripts/generate_review.py --team team-alpha --week 2026-W13 [--save]
+python3 scripts/generate_insights.py --team team-alpha --week 2026-W13 [--save]
 python3 scripts/generate_review.py --team team-alpha --month 2026-03 [--save]
+python3 scripts/generate_insights.py --team team-alpha --month 2026-03 [--save]
 ```
 
 ## Claude Code Skills
 
 - docs/skills/process-daily/ — обработка транскрипции дейлика (raw → summary + json + валидация)
 - docs/skills/prepare-daily/ — подготовка брифинга перед дейликом
-- docs/skills/generate-review/ — генерация weekly/monthly обзоров
+- docs/skills/generate-review/ — генерация weekly/monthly обзоров, аналитики и отчётов
 
 ## Зависимости
-```bash
 pip install jsonschema
-```
 ---
