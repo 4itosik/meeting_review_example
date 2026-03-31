@@ -3,9 +3,33 @@ import argparse
 import json
 from pathlib import Path
 
+try:
+    from jsonschema import validate, ValidationError
+    HAS_JSONSCHEMA = True
+except ImportError:
+    HAS_JSONSCHEMA = False
+
+SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schemas" / "daily_meeting.schema.json"
+
 
 def load_json(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def validate_schema(data: dict):
+    """Validate structured.json against JSON schema. Returns list of errors."""
+    if not HAS_JSONSCHEMA:
+        return ["jsonschema not installed — skip schema validation (pip install jsonschema)"]
+    if not SCHEMA_PATH.exists():
+        return [f"Schema file not found: {SCHEMA_PATH}"]
+    schema = load_json(SCHEMA_PATH)
+    errors = []
+    try:
+        validate(instance=data, schema=schema)
+    except ValidationError as e:
+        path = " → ".join(str(p) for p in e.absolute_path) if e.absolute_path else "(root)"
+        errors.append(f"Schema violation at [{path}]: {e.message}")
+    return errors
 
 
 def check_rules(data: dict, raw_text: str = ""):
@@ -60,6 +84,13 @@ def check_rules(data: dict, raw_text: str = ""):
                 f"{item.get('task', '<no-task>')}"
             )
 
+    # Rule: participant not mentioned in raw.md (possible ghost participant)
+    if raw_text:
+        raw_lower = raw_text.lower()
+        for p in data.get("participants", []):
+            if p.lower() not in raw_lower:
+                warnings.append(f"Participant '{p}' not found in raw.md text")
+
     return errors, warnings
 
 
@@ -77,6 +108,11 @@ def main():
         raw_text = Path(args.raw).read_text(encoding="utf-8")
 
     errors, warnings = check_rules(data, raw_text)
+
+    # Schema validation (before business rules output)
+    schema_errors = validate_schema(data)
+    if schema_errors:
+        errors = schema_errors + errors
 
     if errors:
         print("ERRORS:")
