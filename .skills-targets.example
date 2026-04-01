@@ -1,0 +1,11 @@
+# Маппинг инструментов на целевые директории для скиллов.
+# Формат: name:path (относительно корня проекта)
+#
+# Скрипт link-skills.sh создаёт symlink (или копию с --copy)
+# из docs/skills/* в каждую целевую директорию.
+#
+# Скопируйте: cp .skills-targets.example .skills-targets
+# Закомментируй строку чтобы отключить инструмент.
+
+claude:.claude/skills
+module1:.module1/skills
