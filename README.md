@@ -150,18 +150,12 @@ uv sync
 
 # Через pip
 pip install -r requirements.txt
+```
 
-# Запуск скриптов через uv (без ручной установки)
+Запуск скриптов через uv (без ручной установки):
+
+```bash
 uv run python scripts/check_protocol.py --structured ...
 uv run python scripts/prepare_daily.py --team team-alpha
 uv run python scripts/generate_review.py --team team-alpha --week 2026-W13
 ```
-
-## Проверка после пуша
-
-```bash
-uv sync
-uv run python scripts/check_protocol.py --structured examples/meeting_full/structured.json --raw examples/meeting_full/raw.md
-```
-
-Должно вывести warnings без ошибок установки.
