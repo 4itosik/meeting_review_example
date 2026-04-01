@@ -14,8 +14,10 @@
 git clone https://github.com/4itosik/meeting_review_example.git my-team-daily
 cd my-team-daily
 
-# 2. Установить зависимости
-pip install jsonschema pyyaml
+# 2. Установить зависимости (один из вариантов)
+uv sync # через uv (рекомендуется)
+# или
+pip install -r requirements.txt # через pip
 
 # 3. Настроить команду
 mkdir -p teams/my-team/okr/archive
@@ -143,5 +145,23 @@ bash scripts/link-skills.sh --copy           # копия файлов
 ## Зависимости
 
 ```bash
-pip install jsonschema pyyaml
+# Через uv (рекомендуется)
+uv sync
+
+# Через pip
+pip install -r requirements.txt
+
+# Запуск скриптов через uv (без ручной установки)
+uv run python scripts/check_protocol.py --structured ...
+uv run python scripts/prepare_daily.py --team team-alpha
+uv run python scripts/generate_review.py --team team-alpha --week 2026-W13
 ```
+
+## Проверка после пуша
+
+```bash
+uv sync
+uv run python scripts/check_protocol.py --structured examples/meeting_full/structured.json --raw examples/meeting_full/raw.md
+```
+
+Должно вывести warnings без ошибок установки.
