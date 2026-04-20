@@ -1,0 +1,54 @@
+# История отпусков и отсутствий команды.
+#
+# Поля:
+#   person           — имя из team.yaml → members[*].name
+#   type             — planned | unplanned
+#                      planned   — заранее согласованный отпуск
+#                      unplanned — больничный, форс-мажор, отгул без плана
+#   status           — upcoming | taken | postponed
+#                      upcoming  — ещё не начался
+#                      taken     — состоялся (в том числе идёт прямо сейчас)
+#                      postponed — запланирован, но перенесён на другие даты
+#   planned_start/end — изначально согласованные даты (для planned)
+#   actual_start/end  — фактические даты (для taken; для postponed — новые даты)
+#   reason            — опционально; обязателен для unplanned и postponed
+#   note              — свободный комментарий
+
+vacations:
+ - person: Иван
+   type: planned
+   status: taken
+   planned_start: 2026-02-09
+   planned_end: 2026-02-20
+   actual_start: 2026-02-09
+   actual_end: 2026-02-20
+
+ - person: Мария
+   type: planned
+   status: postponed
+   planned_start: 2026-03-16
+   planned_end: 2026-03-29
+   actual_start: 2026-05-11
+   actual_end: 2026-05-24
+   reason: релиз billing-v2 сдвинулся, тимлид попросил перенести
+   note: новые даты согласованы с Марией
+
+ - person: Алина
+   type: unplanned
+   status: taken
+   actual_start: 2026-04-06
+   actual_end: 2026-04-10
+   reason: больничный
+
+ - person: Петр
+   type: planned
+   status: upcoming
+   planned_start: 2026-05-04
+   planned_end: 2026-05-15
+
+ - person: Артем
+   type: planned
+   status: upcoming
+   planned_start: 2026-04-27
+   planned_end: 2026-04-30
+   note: короткий отпуск, релизы не затрагивает

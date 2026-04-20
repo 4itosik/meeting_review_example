@@ -16,7 +16,7 @@ Usage:
 import argparse
 import json
 import sys
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 try:
@@ -163,7 +163,54 @@ def load_team_context(team: str) -> dict | None:
         if notes_path.exists():
             ctx["notes"] = notes_path.read_text(encoding="utf-8")
 
+    vacations_path = TEAMS_DIR / team / "vacations.yaml"
+    if vacations_path.exists():
+        vac_data = yaml.safe_load(vacations_path.read_text(encoding="utf-8")) or {}
+        ctx["vacations"] = vac_data.get("vacations", [])
+    else:
+        ctx["vacations"] = []
+
     return ctx
+
+
+def _effective_range(v: dict) -> tuple[date | None, date | None]:
+    """Фактические даты, если есть; иначе плановые."""
+    s = v.get("actual_start") or v.get("planned_start")
+    e = v.get("actual_end") or v.get("planned_end")
+    return s, e
+
+
+def bucket_vacations(
+    vacations: list[dict], target: date, horizon_days: int = 14
+) -> tuple[list[dict], list[dict], list[dict]]:
+    """Разложить отпуска на корзины: сейчас, скоро, перенесённые."""
+    out_now: list[dict] = []
+    upcoming: list[dict] = []
+    postponed: list[dict] = []
+    horizon = target + timedelta(days=horizon_days)
+    for v in vacations:
+        start, end = _effective_range(v)
+        if start and end:
+            if start <= target <= end and v.get("status") != "postponed":
+                out_now.append(v)
+            elif target < start <= horizon and v.get("status") in ("upcoming", "postponed"):
+                upcoming.append(v)
+        if v.get("status") == "postponed":
+            postponed.append(v)
+    return out_now, upcoming, postponed
+
+
+def _format_vacation_line(v: dict) -> str:
+    start, end = _effective_range(v)
+    type_mark = "неплан" if v.get("type") == "unplanned" else "план"
+    parts = [f"{v['person']} [{type_mark}] {start} → {end}"]
+    if v.get("status") == "postponed":
+        parts.append(
+            f"(перенос с {v.get('planned_start')}–{v.get('planned_end')})"
+        )
+    if v.get("reason"):
+        parts.append(f"— {v['reason']}")
+    return " ".join(parts)
 
 
 def format_briefing(
@@ -202,6 +249,27 @@ def format_briefing(
                 lines.append(header)
                 if knowledge:
                     lines.append(f"  кто знает: {knowledge}")
+            lines.append("")
+
+    # Vacations
+    if team_ctx and team_ctx.get("vacations"):
+        out_now, upcoming_vac, postponed = bucket_vacations(
+            team_ctx["vacations"], target_date
+        )
+        if out_now or upcoming_vac or postponed:
+            lines.append("## Отпуска")
+            if out_now:
+                lines.append(f"Сейчас отсутствуют ({len(out_now)}):")
+                for v in out_now:
+                    lines.append(f"- {_format_vacation_line(v)}")
+            if upcoming_vac:
+                lines.append(f"Уходят в ближайшие 14 дней ({len(upcoming_vac)}):")
+                for v in upcoming_vac:
+                    lines.append(f"- {_format_vacation_line(v)}")
+            if postponed:
+                lines.append(f"Перенесённые ({len(postponed)}):")
+                for v in postponed:
+                    lines.append(f"- {_format_vacation_line(v)}")
             lines.append("")
 
     # Speaking order

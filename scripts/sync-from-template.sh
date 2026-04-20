@@ -31,14 +31,28 @@ if [ -z "$TEMPLATE_REPO" ]; then
 fi
 
 CLEANUP_TMP=false
+TMP_DIR=""
+cleanup() {
+  if [ "$CLEANUP_TMP" = true ] && [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ]; then
+    rm -rf "$TMP_DIR"
+  fi
+}
+trap cleanup EXIT
+
 if [[ "$TEMPLATE_REPO" == http* ]] || [[ "$TEMPLATE_REPO" == git@* ]]; then
   TMP_DIR=$(mktemp -d)
+  CLEANUP_TMP=true
   echo "Cloning template from $TEMPLATE_REPO ..."
   git clone --depth 1 "$TEMPLATE_REPO" "$TMP_DIR" 2>/dev/null
   TEMPLATE_DIR="$TMP_DIR"
-  CLEANUP_TMP=true
 else
   TEMPLATE_DIR="$(cd "$TEMPLATE_REPO" && pwd)"
+fi
+
+if [ "$TEMPLATE_DIR" = "$PROJECT_DIR" ]; then
+  echo "ERROR: template and target point to the same directory ($PROJECT_DIR)."
+  echo "       Nothing to sync."
+  exit 1
 fi
 
 SYNC_DIRS=(
@@ -47,12 +61,18 @@ SYNC_DIRS=(
   "docs/skills"
   "prompts"
   "examples"
+  "templates"
 )
 
 SYNC_FILES=(
   "AGENTS.md"
   "STYLEGUIDE.md"
   "DAILY_STANDUP_PROTOCOL.md"
+  "DAILY_STANDUP_PARTICIPANT.md"
+  "pyproject.toml"
+  "requirements.txt"
+  ".skills-targets.example"
+  ".python-version"
 )
 
 echo ""
@@ -87,7 +107,7 @@ for dir in "${SYNC_DIRS[@]}"; do
     cp "$file" "$dst_file"
     echo "UPDATED: $dir/$rel"
     UPDATED=$((UPDATED + 1))
-  done < <(find "$src" -type f -print0)
+  done < <(find "$src" -type f \! -name '.DS_Store' -print0)
 done
 
 for file in "${SYNC_FILES[@]}"; do
@@ -109,13 +129,8 @@ for file in "${SYNC_FILES[@]}"; do
   UPDATED=$((UPDATED + 1))
 done
 
-SELF_SRC="$TEMPLATE_DIR/scripts/sync-from-template.sh"
-SELF_DST="$PROJECT_DIR/scripts/sync-from-template.sh"
-if [ -f "$SELF_SRC" ] && [ -f "$SELF_DST" ] && ! diff -q "$SELF_SRC" "$SELF_DST" >/dev/null 2>&1; then
-  cp "$SELF_SRC" "$SELF_DST"
-  echo "UPDATED: scripts/sync-from-template.sh (self-update)"
-  UPDATED=$((UPDATED + 1))
-fi
+# Self-update is deferred to the very end — bash reads this script from disk
+# line-by-line, so overwriting it here would corrupt the still-running process.
 
 # README.md: sync template but preserve custom block
 CUSTOM_START="<!-- CUSTOM START -->"
@@ -133,7 +148,7 @@ if [ -f "$README_SRC" ]; then
 
   if [ -n "$CUSTOM_BLOCK" ]; then
     CUSTOM_TMP=$(mktemp)
-    echo "$CUSTOM_BLOCK" > "$CUSTOM_TMP"
+    printf '%s\n' "$CUSTOM_BLOCK" > "$CUSTOM_TMP"
     DEFAULT_BLOCK_FILE=$(mktemp)
     sed -n "/$CUSTOM_START/,/$CUSTOM_END/p" "$README_DST" > "$DEFAULT_BLOCK_FILE"
     python3 -c "
@@ -150,13 +165,6 @@ open('$README_DST', 'w').write(readme)
   UPDATED=$((UPDATED + 1))
 fi
 
-if [ "$CLEANUP_TMP" = true ]; then
-  rm -rf "$TMP_DIR"
-fi
-
-echo ""
-echo "Done. Updated: $UPDATED files. Skipped: $SKIPPED dirs/files."
-
 # Auto-deploy skills to harness targets (if configured)
 LINK_SCRIPT="$PROJECT_DIR/scripts/link-skills.sh"
 if [ -f "$LINK_SCRIPT" ] && [ -f "$PROJECT_DIR/.skills-targets" ]; then
@@ -165,12 +173,37 @@ if [ -f "$LINK_SCRIPT" ] && [ -f "$PROJECT_DIR/.skills-targets" ]; then
   bash "$LINK_SCRIPT"
 fi
 
+# Self-update — must be the last step that touches the filesystem, because
+# overwriting the currently-running script mid-execution would corrupt bash's
+# parsing of the remaining lines.
+SELF_SRC="$TEMPLATE_DIR/scripts/sync-from-template.sh"
+SELF_DST="$PROJECT_DIR/scripts/sync-from-template.sh"
+SELF_UPDATED=false
+if [ -f "$SELF_SRC" ] && [ -f "$SELF_DST" ] && ! diff -q "$SELF_SRC" "$SELF_DST" >/dev/null 2>&1; then
+  cp "$SELF_SRC" "$SELF_DST"
+  echo "UPDATED: scripts/sync-from-template.sh (self-update)"
+  UPDATED=$((UPDATED + 1))
+  SELF_UPDATED=true
+fi
+
+echo ""
+echo "Done. Updated: $UPDATED files. Skipped: $SKIPPED dirs/files."
+
+if [ "$SELF_UPDATED" = true ]; then
+  echo ""
+  echo "NOTE: sync-from-template.sh обновился. Перезапусти команду — новая"
+  echo "      версия может синхронизировать дополнительные файлы."
+fi
+
 if [ "$UPDATED" -gt 0 ]; then
   echo ""
   echo "Review changes:"
   echo " cd $PROJECT_DIR && git diff"
   echo ""
   echo "Commit:"
-  echo " git add scripts/ schemas/ docs/ prompts/ examples/ AGENTS.md STYLEGUIDE.md DAILY_STANDUP_PROTOCOL.md README.md"
+  echo " git add scripts/ schemas/ docs/ prompts/ examples/ templates/ \\"
+  echo "         AGENTS.md STYLEGUIDE.md DAILY_STANDUP_PROTOCOL.md \\"
+  echo "         DAILY_STANDUP_PARTICIPANT.md pyproject.toml requirements.txt \\"
+  echo "         .skills-targets.example .python-version README.md"
   echo " git commit -m 'chore: sync core from template'"
 fi
