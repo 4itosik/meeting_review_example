@@ -3,34 +3,50 @@ lead: Артем
 timezone: Europe/Moscow
 current_okr: okr/2026-Q2.yaml
 lead_notes: lead-notes.md
+personal_okrs_notes: personal-okrs/
 
 members:
  - name: Артем
    role: Тимлид
    focus: архитектура, координация, релизы
-   skills: [Ruby, Go, Kubernetes, PostgreSQL]
-   joined: 2026-03-01
 
  - name: Иван
    role: Backend-разработчик
    focus: API, интеграции, вебхуки
-   skills: [Go, PostgreSQL, RabbitMQ]
-   joined: 2026-03-01
 
  - name: Мария
    role: Frontend-разработчик
    focus: UI компоненты, формы, отчёты
-   skills: [React, TypeScript]
-   joined: 2026-03-01
 
  - name: Петр
    role: Backend-разработчик
    focus: billing, observability, метрики
-   skills: [Go, PostgreSQL, Prometheus, Grafana]
-   joined: 2026-03-01
 
  - name: Алина
    role: QA-инженер
    focus: e2e тесты, автоматизация тестирования
-   skills: [Playwright, Python]
-   joined: 2026-03-01
+
+modules:
+ - name: api-gateway
+   description: Внешний API, REST-эндпоинты, аутентификация
+   knowledge: Основной — Иван. Архитектурные решения — Артем.
+
+ - name: billing
+   description: Тарификация, счета, интеграция с платёжными провайдерами
+   knowledge: Глубоко — Петр. Интеграционная часть — Иван (поверхностно).
+
+ - name: webhooks
+   description: Доставка событий во внешние системы, retry, DLQ
+   knowledge: Иван. Петр может подхватить при необходимости.
+
+ - name: observability
+   description: Метрики, логирование, алерты, дашборды
+   knowledge: Петр (owner de facto). Остальные — пользователи.
+
+ - name: ui-reports
+   description: UI отчётов и форм в админке
+   knowledge: Мария. Никто больше глубоко не знает.
+
+ - name: e2e-tests
+   description: Автотесты сквозных сценариев, CI-пайплайн тестов
+   knowledge: Алина. Артем помогал с инфраструктурой CI.

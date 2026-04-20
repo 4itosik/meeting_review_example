@@ -25,6 +25,8 @@ try:
 except ImportError:
     HAS_YAML = False
 
+from okr_utils import releases_upcoming, releases_at_risk
+
 MEETINGS_DIR = Path(__file__).resolve().parent.parent / "meetings"
 TEAMS_DIR = Path(__file__).resolve().parent.parent / "teams"
 
@@ -187,6 +189,21 @@ def format_briefing(
                 lines.append(f"- {m['name']}: {m.get('role', '')} ({m.get('focus', '')})")
             lines.append("")
 
+        modules = team_ctx["config"].get("modules", [])
+        if modules:
+            lines.append(f"## Модули ({len(modules)})")
+            for mod in modules:
+                name = mod.get("name", "?")
+                desc = mod.get("description", "")
+                knowledge = mod.get("knowledge", "")
+                header = f"- {name}"
+                if desc:
+                    header += f" — {desc}"
+                lines.append(header)
+                if knowledge:
+                    lines.append(f"  кто знает: {knowledge}")
+            lines.append("")
+
     # Speaking order
     if speaking_order:
         lines.append("## Порядок выступлений")
@@ -195,7 +212,7 @@ def format_briefing(
             lines.append(f"{i}. {name}{suffix}")
         lines.append("")
 
-    # OKR at risk
+    # OKR at risk (team-level only — personal OKRs are not tracked automatically)
     if team_ctx and team_ctx.get("okr"):
         okr = team_ctx["okr"]
         at_risk = []
@@ -203,15 +220,36 @@ def format_briefing(
             for kr in obj.get("key_results", []):
                 if kr.get("status") == "at_risk":
                     at_risk.append(f"{kr['kr']} ({kr.get('progress', 0)}%)")
-        for person, objs in okr.get("personal_okrs", {}).items():
-            for obj in objs:
-                for kr in obj.get("key_results", []):
-                    if kr.get("status") == "at_risk":
-                        at_risk.append(f"[{person}] {kr['kr']} ({kr.get('progress', 0)}%)")
         if at_risk:
             lines.append(f"## OKR at risk ({len(at_risk)})")
             for item in at_risk:
                 lines.append(f"- {item}")
+            lines.append("")
+
+        # Releases within 21 days — важный сигнал перед dev_freeze
+        upcoming = releases_upcoming(okr, target_date)
+        at_risk_keys = {
+            (r["objective"], r["kr"]) for r in releases_at_risk(okr, target_date)
+        }
+        if upcoming:
+            lines.append(f"## Релизы близко ({len(upcoming)})")
+            for r in upcoming:
+                tag = f"[{r['release']}] " if r.get("release") else ""
+                days_left = r["days_left"]
+                when = (
+                    f"просрочено на {-days_left}д"
+                    if days_left < 0
+                    else f"через {days_left}д"
+                )
+                marker = (
+                    "  ← at risk"
+                    if (r["objective"], r["kr"]) in at_risk_keys
+                    else ""
+                )
+                lines.append(
+                    f"- {tag}{r['kr']}: dev_freeze {when}, "
+                    f"прогресс {r['progress']}%{marker}"
+                )
             lines.append("")
 
     # Yesterday's plans

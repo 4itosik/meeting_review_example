@@ -19,6 +19,8 @@ from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
 
+from okr_utils import load_team_okr, releases_at_risk
+
 MEETINGS_DIR = Path(__file__).resolve().parent.parent / "meetings"
 REVIEWS_DIR = Path(__file__).resolve().parent.parent / "reviews"
 
@@ -163,6 +165,31 @@ def detect_most_blocked_persons(meetings):
     return [{"person": p, "blocker_count": c} for p, c in blocked.most_common()]
 
 
+def detect_completion_by_owner(meetings):
+    totals = Counter()
+    dones = Counter()
+    for m in meetings:
+        for ai in m["data"].get("action_items", []):
+            owner = ai.get("owner")
+            if not owner:
+                continue
+            totals[owner] += 1
+            if ai.get("status") == "done":
+                dones[owner] += 1
+    results = []
+    for owner, total in totals.items():
+        done_count = dones[owner]
+        pct = round(done_count / total * 100) if total else 0
+        results.append({
+            "owner": owner,
+            "done": done_count,
+            "total": total,
+            "pct": pct,
+            "lagging": total >= 2 and pct < 50,
+        })
+    return sorted(results, key=lambda x: x["pct"])
+
+
 def detect_ghost_owners(meetings):
     ghost_count = Counter()
     for m in meetings:
@@ -174,7 +201,7 @@ def detect_ghost_owners(meetings):
     return [{"owner": o, "count": c} for o, c in ghost_count.most_common() if c > 0]
 
 
-def format_insights(team, period_label, date_from, date_to, meetings):
+def format_insights(team, period_label, date_from, date_to, meetings, okr=None):
     lines = []
     lines.append(f"# Insights — {period_label} — {team}")
     lines.append("")
@@ -183,6 +210,31 @@ def format_insights(team, period_label, date_from, date_to, meetings):
 
     ref_date = date_to + timedelta(days=1)
     insights_found = 0
+
+    if okr:
+        at_risk = releases_at_risk(okr, ref_date)
+        if at_risk:
+            insights_found += 1
+            lines.append(f"## Релизы в риске ({len(at_risk)})")
+            for r in at_risk:
+                tag = f"[{r['release']}] " if r.get("release") else ""
+                rel_part = f", релиз {r['release_date']}" if r.get("release_date") else ""
+                days_left = r["days_left"]
+                when = (
+                    f"просрочено на {-days_left}д"
+                    if days_left < 0
+                    else f"через {days_left}д"
+                )
+                lines.append(
+                    f"- {tag}{r['objective']} / {r['kr']} — "
+                    f"dev_freeze {when} ({r['dev_freeze']}){rel_part}, "
+                    f"прогресс {r['progress']}% (< 70%)"
+                )
+            lines.append("")
+            lines.append(
+                "→ Рекомендация: проверить статус, решить — сдвигать dev_freeze или усилить ресурсы."
+            )
+            lines.append("")
 
     overdue = detect_overdue_items(meetings, ref_date)
     if overdue:
@@ -267,6 +319,19 @@ def format_insights(team, period_label, date_from, date_to, meetings):
         lines.append("→ Рекомендация: проанализировать зависимости этих людей. Возможно, нужен приоритетный канал разблокировки.")
         lines.append("")
 
+    completion = detect_completion_by_owner(meetings)
+    if completion:
+        insights_found += 1
+        lines.append("## Исполняемость поручений по людям")
+        for c in completion:
+            marker = "  ← отставание" if c["lagging"] else ""
+            lines.append(
+                f"- {c['owner']}: {c['done']}/{c['total']} закрыто ({c['pct']}%){marker}"
+            )
+        lines.append("")
+        lines.append("→ Рекомендация: «отставание» — закрыто <50% при ≥2 поручениях за период. Обсудить на 1-1 причины.")
+        lines.append("")
+
     ghosts = detect_ghost_owners(meetings)
     if ghosts:
         insights_found += 1
@@ -319,7 +384,8 @@ def main():
         print(f"No meetings found for {args.team} in {date_from} — {date_to}")
         sys.exit(0)
 
-    output = format_insights(args.team, period_label, date_from, date_to, meetings)
+    okr = load_team_okr(args.team)
+    output = format_insights(args.team, period_label, date_from, date_to, meetings, okr=okr)
     print(output)
 
     if args.save:

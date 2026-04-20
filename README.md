@@ -34,7 +34,15 @@ bash scripts/link-skills.sh
 # 6. Удалить пример team-alpha (опционально)
 rm -rf teams/team-alpha meetings/2026
 
-# 7. Переинициализировать git
+# 7. Скрыть приватные файлы из git (lead-notes, personal-okrs)
+cat >> .gitignore <<'EOF'
+
+# Приватные файлы команды — держим вне git
+teams/*/lead-notes.md
+teams/*/personal-okrs/
+EOF
+
+# 8. Переинициализировать git
 rm -rf .git
 git init && git add . && git commit -m "init: daily registry for my-team"
 ```
@@ -75,6 +83,42 @@ teams/team-alpha/
 ```
 
 `team.yaml` — единая точка входа. Поле `current_okr` указывает на актуальный OKR-файл.
+
+### Модули команды
+
+В `team.yaml` можно описать секцию `modules` — каталог компонентов/подсистем,
+которые ведёт команда. Используется как справочник «кого тянуть по какой области»
+и автоматически выводится в брифинге `prepare-daily`.
+
+```yaml
+modules:
+ - name: billing
+   description: Тарификация, счета, интеграция с платёжными провайдерами
+   knowledge: Глубоко — Петр. Интеграционная часть — Иван (поверхностно).
+```
+
+Поля `description` и `knowledge` опциональны, `knowledge` — свободный текст.
+
+### План освоения модулей (learning_plan)
+
+Если в квартале есть цель распределить знания по модулям между людьми,
+к конкретному KR в `okr/<quarter>.yaml` можно добавить `learning_plan`:
+
+```yaml
+- kr: "Определён финальный список принимаемых компонентов"
+  progress: 0
+  status: not_started
+  learning_plan:
+   - person: Иван
+     modules:
+      - module: billing
+        goal: разобраться в интеграциях, уметь чинить инциденты
+        progress: 0
+```
+
+Имена в `person` должны совпадать с `team.yaml → members[*].name`,
+а в `module` — с `team.yaml → modules[*].name`. Это квартальная штука:
+при архивации OKR уходит вместе с ним, каталог `modules` остаётся.
 
 ## Принципы
 
@@ -121,6 +165,11 @@ python3 scripts/generate_insights.py --team team-alpha --week 2026-W13 [--save]
 ```bash
 python3 scripts/archive_quarter.py --team team-alpha [--next 2026-Q3]
 ```
+
+> TODO: на текущий момент `archive_quarter.py` ротирует только `okr/` (команда).
+> Личные OKR в `personal-okrs/<quarter>.md` нужно перекладывать в `personal-okrs/archive/`
+> вручную и создавать новый файл для следующего квартала.
+> Автоматизировать ротацию personal-okrs внутри этого же скрипта — в беклоге.
 
 Синхронизация из шаблона:
 

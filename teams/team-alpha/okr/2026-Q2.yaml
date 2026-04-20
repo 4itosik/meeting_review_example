@@ -1,69 +1,92 @@
 quarter: 2026-Q2
 period: 2026-04-01 — 2026-06-30
-updated: 2026-03-31
+updated: 2026-04-20
 
 # Статусы: not_started, on_track, at_risk, done, dropped
 # Progress: 0–100
+#
+# Поля релиза (опционально — добавляются к Objective или к KR):
+#   release       — тег релиза (например, R-2026.05)
+#   dev_freeze    — дата заморозки кода (главный дедлайн для команды)
+#   release_date  — дата выхода в прод (обычно dev_freeze + ~1 месяц на тестирование)
+# KR-поля переопределяют Objective, если указаны. Иначе KR наследует от Objective.
+# «At risk»: до dev_freeze осталось ≤ 21д И progress < 70%.
+#
+# personal_okrs ведутся в teams/<team>/personal-okrs/<quarter>.md
+# архив прошлых кварталов: teams/<team>/personal-okrs/archive/<quarter>.md
+# В шаблоне эти файлы — пример и лежат в git.
+# В реальной команде папка personal-okrs/ добавляется в .gitignore
+# (см. README → Быстрый старт).
+#
+# learning_plan (опционально, внутри KR) — план освоения модулей на квартал.
+# Формат:
+#   learning_plan:
+#    - person: <имя из team.yaml → members>
+#      modules:
+#       - module: <имя из team.yaml → modules[*].name>
+#         goal: <что человек должен уметь к концу квартала>
+#         progress: 0–100
+# Используется для KR, связанных с распределением знаний/компетенций.
+# Каталог модулей (описание + текущие эксперты) лежит в team.yaml → modules.
 
 team_okrs:
- - objective: "Запустить платежный модуль в прод"
+ - objective: "Внедрить функционал"
+   release: R-2026.05
+   dev_freeze: 2026-05-10
+   release_date: 2026-06-10
    key_results:
-    - kr: "Все платежные сценарии покрыты e2e тестами"
-      progress: 40
-      status: on_track
-    - kr: "0 критических багов на staging в течение 5 дней"
-      progress: 20
-      status: on_track
-    - kr: "Релиз в прод до 15 мая"
+    - kr: "Функционал выкачен в прод на 100%"
       progress: 0
       status: not_started
 
- - objective: "Снизить время отклика API до p99 < 200ms"
+ - objective: "Разработать выбор модели и языка"
+   release: R-2026.06
+   dev_freeze: 2026-06-01
+   release_date: 2026-07-01
    key_results:
-    - kr: "Профилирование и устранение top-3 узких мест"
-      progress: 10
-      status: at_risk
-    - kr: "Дашборд с p95/p99 метриками в Grafana"
+    - kr: "Пользователь может выбрать модель в UI"
       progress: 0
       status: not_started
 
-personal_okrs:
- Иван:
-  - objective: "Стать владельцем интеграционного слоя"
-    key_results:
-     - kr: "Задокументировать все API-контракты с CRM"
-       progress: 30
-       status: on_track
-     - kr: "Реализовать идемпотентность для всех callback-эндпоинтов"
-       progress: 0
-       status: not_started
+ - objective: "Принять на поддержку и развитие компоненты команды"
+   # без dev_freeze — цель не привязана к релизу
+   key_results:
+    - kr: "Определён финальный список принимаемых компонентов"
+      progress: 0
+      status: not_started
+      # План освоения модулей на квартал. Имена модулей должны совпадать
+      # с teams/<team>/team.yaml → modules[*].name.
+      # progress 0–100 — насколько человек уже разобрался в модуле к текущей дате.
+      learning_plan:
+       - person: Иван
+         modules:
+          - module: billing
+            goal: разобраться в тарификации и интеграциях с провайдерами, уметь чинить инциденты
+            progress: 0
+          - module: observability
+            goal: читать ключевые дашборды, понимать смысл алертов
+            progress: 0
 
- Мария:
-  - objective: "Повысить качество UI-компонентов"
-    key_results:
-     - kr: "Покрыть все формы unit-тестами (>80%)"
-       progress: 20
-       status: on_track
-     - kr: "Внедрить Storybook для компонентов платежного модуля"
-       progress: 0
-       status: not_started
+       - person: Мария
+         modules:
+          - module: api-gateway
+            goal: понимать контракты и аутентификацию, делать ревью API-изменений на фронте
+            progress: 0
 
- Петр:
-  - objective: "Построить observability для billing"
-    key_results:
-     - kr: "Дашборд p95/p99 по всем эндпоинтам billing"
-       progress: 0
-       status: not_started
-     - kr: "Алерты на деградацию >20% от baseline"
-       progress: 0
-       status: not_started
+       - person: Петр
+         modules:
+          - module: webhooks
+            goal: уметь самостоятельно дебажить доставку и DLQ без Ивана
+            progress: 0
 
- Алина:
-  - objective: "Стабилизировать e2e-тестирование"
-    key_results:
-     - kr: "Flaky rate < 5% за квартал"
-       progress: 15
-       status: on_track
-     - kr: "Smoke suite проходит за < 10 минут"
-       progress: 30
-       status: on_track
+       - person: Алина
+         modules:
+          - module: observability
+            goal: использовать метрики и логи при разборе падений e2e
+            progress: 0
+
+       - person: Артем
+         modules:
+          - module: e2e-tests
+            goal: разобраться в структуре тестов (не только CI), чтобы делать ревью изменений
+            progress: 0

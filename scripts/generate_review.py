@@ -17,6 +17,12 @@ from collections import Counter, defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 
+from okr_utils import (
+    load_team_okr,
+    iter_kr_with_release,
+    releases_at_risk,
+)
+
 MEETINGS_DIR = Path(__file__).resolve().parent.parent / "meetings"
 REVIEWS_DIR = Path(__file__).resolve().parent.parent / "reviews"
 
@@ -122,12 +128,78 @@ def aggregate(meetings: list[dict]) -> dict:
     }
 
 
+def format_okr_progress(okr: dict) -> list[str]:
+    """Build 'OKR Progress (team)' section as markdown lines."""
+    team_okrs = okr.get("team_okrs", [])
+    if not team_okrs:
+        return []
+    lines = []
+    quarter = okr.get("quarter", "")
+    header = "## OKR Progress (team)"
+    if quarter:
+        header += f" — {quarter}, снимок на дату отчёта"
+    lines.append(header)
+    all_progress = []
+    for obj in team_okrs:
+        krs = obj.get("key_results", [])
+        if not krs:
+            continue
+        progs = [kr.get("progress", 0) for kr in krs]
+        avg = round(sum(progs) / len(progs))
+        all_progress.extend(progs)
+        lines.append(f"- {obj['objective']}: {avg}% ({len(krs)} KR)")
+    if all_progress:
+        overall = round(sum(all_progress) / len(all_progress))
+        lines.append("")
+        lines.append(f"Общий прогресс команды: {overall}%")
+    lines.append("")
+    return lines
+
+
+def format_releases(okr: dict, ref_date: date) -> list[str]:
+    """Build '## Релизы' section: all KRs with dev_freeze, sorted by urgency."""
+    items = list(iter_kr_with_release(okr))
+    if not items:
+        return []
+    items_with_days = [
+        {**it, "days_left": (it["dev_freeze"] - ref_date).days} for it in items
+    ]
+    items_with_days.sort(key=lambda x: x["days_left"])
+
+    at_risk_keys = {
+        (r["objective"], r["kr"]) for r in releases_at_risk(okr, ref_date)
+    }
+
+    lines = ["## Релизы"]
+    for it in items_with_days:
+        tag = f"[{it['release']}] " if it.get("release") else ""
+        rel_part = f", релиз {it['release_date']}" if it.get("release_date") else ""
+        days = it["days_left"]
+        if days < 0:
+            days_str = f"просрочено на {-days}д"
+        else:
+            days_str = f"осталось {days}д"
+        risk_marker = (
+            "  ← at risk"
+            if (it["objective"], it["kr"]) in at_risk_keys
+            else ""
+        )
+        lines.append(
+            f"- {tag}{it['objective']} / {it['kr']}: "
+            f"dev_freeze {it['dev_freeze']} ({days_str}){rel_part}, "
+            f"прогресс {it['progress']}%{risk_marker}"
+        )
+    lines.append("")
+    return lines
+
+
 def format_review(
     team: str,
     period_label: str,
     date_from: date,
     date_to: date,
     agg: dict,
+    okr: dict | None = None,
 ) -> str:
     lines = []
     lines.append(f"# {period_label} — {team}")
@@ -146,6 +218,11 @@ def format_review(
         f"dropped {len(agg['action_items_dropped'])}."
     )
     lines.append("")
+
+    # OKR progress snapshot (team-level only)
+    if okr:
+        lines.extend(format_okr_progress(okr))
+        lines.extend(format_releases(okr, ref_date=date_to))
 
     # Done by person
     if agg["done"]:
@@ -246,7 +323,8 @@ def main():
         sys.exit(0)
 
     agg = aggregate(meetings)
-    review = format_review(args.team, period_label, date_from, date_to, agg)
+    okr = load_team_okr(args.team)
+    review = format_review(args.team, period_label, date_from, date_to, agg, okr=okr)
     print(review)
 
     if args.save:
