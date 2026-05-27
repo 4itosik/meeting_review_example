@@ -74,10 +74,18 @@ def aggregate(meetings: list[dict]) -> dict:
     all_offtopic = []
     participation = Counter()
     blocker_by_date = defaultdict(list)
+    jira_issues = {}
 
     for m in meetings:
         d = m["data"]
         meeting_date = d["date"]
+
+        for issue in d.get("jira_issues", []) or []:
+            key = issue.get("key")
+            if not key:
+                continue
+            # Keep the latest snapshot (meetings are sorted ascending by date)
+            jira_issues[key] = {**issue, "date": meeting_date}
 
         for upd in d.get("updates", []):
             person = upd["person"]
@@ -125,6 +133,7 @@ def aggregate(meetings: list[dict]) -> dict:
         "topics": all_topics.most_common(),
         "offtopic": all_offtopic,
         "participation": participation,
+        "jira_issues": sorted(jira_issues.values(), key=lambda x: x["key"]),
     }
 
 
@@ -272,6 +281,19 @@ def format_review(
         lines.append("## Ключевые темы")
         topics_str = ", ".join(f"{t} ({c})" for t, c in agg["topics"][:10])
         lines.append(f"{topics_str}")
+        lines.append("")
+
+    # Jira issues discussed in the period
+    if agg.get("jira_issues"):
+        lines.append(f"## Задачи Jira ({len(agg['jira_issues'])})")
+        for issue in agg["jira_issues"]:
+            status = issue.get("status") or "?"
+            assignee = issue.get("assignee") or "не назначен"
+            summary = issue.get("summary") or ""
+            summary_part = f" — {summary}" if summary else ""
+            lines.append(
+                f"- {issue['key']} [{status}, {assignee}]{summary_part}"
+            )
         lines.append("")
 
     # Participation

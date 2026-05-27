@@ -64,6 +64,22 @@
       }
     },
     "topics": { "type": "array", "items": { "type": "string" } },
-    "offtopic": { "type": "array", "items": { "type": "string" } }
+    "offtopic": { "type": "array", "items": { "type": "string" } },
+    "jira_issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key"],
+        "additionalProperties": false,
+        "properties": {
+          "key": { "type": "string", "pattern": "^[A-Z][A-Z0-9]+-[0-9]+$" },
+          "summary": { "type": ["string", "null"] },
+          "status": { "type": ["string", "null"] },
+          "assignee": { "type": ["string", "null"] },
+          "url": { "type": ["string", "null"] },
+          "mentioned_as": { "type": ["string", "null"] }
+        }
+      }
+    }
   }
 }

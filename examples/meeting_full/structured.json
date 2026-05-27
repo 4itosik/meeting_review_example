@@ -38,5 +38,31 @@
     }
   ],
   "topics": ["API", "Биллинг", "Релиз"],
-  "offtopic": ["Обсуждение корпоратива"]
+  "offtopic": ["Обсуждение корпоратива"],
+  "jira_issues": [
+    {
+      "key": "TASK-101",
+      "summary": "Вебхуки: ретраи доставки",
+      "status": "Done",
+      "assignee": "Иван",
+      "url": "https://example.atlassian.net/browse/TASK-101",
+      "mentioned_as": "101"
+    },
+    {
+      "key": "TASK-103",
+      "summary": "Форма отчётов: фильтр по дате",
+      "status": "In Review",
+      "assignee": "Мария",
+      "url": "https://example.atlassian.net/browse/TASK-103",
+      "mentioned_as": "TASK-103"
+    },
+    {
+      "key": "TASK-110",
+      "summary": "Биллинг: пересчёт тарифа",
+      "status": "To Do",
+      "assignee": "Пётр",
+      "url": "https://example.atlassian.net/browse/TASK-110",
+      "mentioned_as": "110"
+    }
+  ]
 }

@@ -82,5 +82,31 @@
     }
   ],
   "topics": ["Платежный флоу", "Релиз-кандидат", "RabbitMQ", "Review", "E2E"],
-  "offtopic": ["Перенос командного демо с пятницы на понедельник"]
+  "offtopic": ["Перенос командного демо с пятницы на понедельник"],
+  "jira_issues": [
+    {
+      "key": "TASK-241",
+      "summary": "Ретраи доставки вебхуков",
+      "status": "Done",
+      "assignee": "Иван",
+      "url": "https://example.atlassian.net/browse/TASK-241",
+      "mentioned_as": "TASK-241"
+    },
+    {
+      "key": "TASK-257",
+      "summary": "Идемпотентность callback",
+      "status": "In Progress",
+      "assignee": "Иван",
+      "url": "https://example.atlassian.net/browse/TASK-257",
+      "mentioned_as": "TASK-257"
+    },
+    {
+      "key": "TASK-262",
+      "summary": "Метрики p95/p99 по billing",
+      "status": "To Do",
+      "assignee": "Петр",
+      "url": "https://example.atlassian.net/browse/TASK-262",
+      "mentioned_as": "TASK-262"
+    }
+  ]
 }
