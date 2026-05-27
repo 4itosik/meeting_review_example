@@ -5,3 +5,5 @@
 .claude/
 .module1/
 .venv/
+__pycache__/
+*.pyc
