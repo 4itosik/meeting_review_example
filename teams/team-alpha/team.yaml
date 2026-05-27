@@ -5,6 +5,13 @@ current_okr: okr/2026-Q2.yaml
 lead_notes: lead-notes.md
 personal_okrs_notes: personal-okrs/
 
+# Конфиг Jira-трекера. project_prefix — константа, которую скиллы подставляют,
+# когда в дейлике называют задачу одним номером (например "закрыл 103" → TASK-103).
+# Если в реплике явно назван другой префикс (BILL-45) — используется он, а не константа.
+jira:
+ project_prefix: TASK
+ base_url: https://example.atlassian.net
+
 members:
  - name: Артем
    role: Тимлид
