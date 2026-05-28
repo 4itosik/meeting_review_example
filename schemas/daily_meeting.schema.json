@@ -76,7 +76,6 @@
           "summary": { "type": ["string", "null"] },
           "status": { "type": ["string", "null"] },
           "assignee": { "type": ["string", "null"] },
-          "url": { "type": ["string", "null"] },
           "mentioned_as": { "type": ["string", "null"] }
         }
       }
