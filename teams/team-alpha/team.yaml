@@ -12,6 +12,10 @@ personal_okrs_notes: personal-okrs/
 jira:
  project_prefix: TASK
 
+# aliases (опционально) — альтернативные написания имени в транскрипциях
+# («Ваня», «Иван П.»). Скилл process-daily нормализует имена к members[*].name,
+# а check_protocol.py учитывает aliases, чтобы не ругаться, что нормализованного
+# имени нет в raw.md. Разница е/ё («Пётр» vs «Петр») учитывается автоматически.
 members:
  - name: Артем
    role: Тимлид
@@ -20,6 +24,7 @@ members:
  - name: Иван
    role: Backend-разработчик
    focus: API, интеграции, вебхуки
+   aliases: [Ваня]
 
  - name: Мария
    role: Frontend-разработчик

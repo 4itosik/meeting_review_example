@@ -85,11 +85,32 @@
   "offtopic": ["Перенос командного демо с пятницы на понедельник"],
   "jira_issues": [
     {
+      "key": "TASK-233",
+      "summary": "UI статусов оплаты",
+      "status": "In Review",
+      "assignee": "Мария",
+      "mentioned_as": "TASK-233"
+    },
+    {
+      "key": "TASK-238",
+      "summary": "Миграции billing",
+      "status": "Done",
+      "assignee": "Петр",
+      "mentioned_as": "TASK-238"
+    },
+    {
       "key": "TASK-241",
       "summary": "Ретраи доставки вебхуков",
       "status": "Done",
       "assignee": "Иван",
       "mentioned_as": "TASK-241"
+    },
+    {
+      "key": "TASK-245",
+      "summary": "E2E smoke",
+      "status": "Done",
+      "assignee": "Алина",
+      "mentioned_as": "TASK-245"
     },
     {
       "key": "TASK-257",
@@ -99,11 +120,25 @@
       "mentioned_as": "TASK-257"
     },
     {
+      "key": "TASK-260",
+      "summary": "Ошибки в форме возврата",
+      "status": "To Do",
+      "assignee": "Мария",
+      "mentioned_as": "TASK-260"
+    },
+    {
       "key": "TASK-262",
       "summary": "Метрики p95/p99 по billing",
       "status": "To Do",
       "assignee": "Петр",
       "mentioned_as": "TASK-262"
+    },
+    {
+      "key": "TASK-264",
+      "summary": "Стабилизация e2e",
+      "status": "To Do",
+      "assignee": "Алина",
+      "mentioned_as": "TASK-264"
     }
   ]
 }

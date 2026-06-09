@@ -11,57 +11,19 @@ Usage:
  python3 scripts/generate_review.py --team team-alpha --from 2026-03-24 --to 2026-03-31
 """
 import argparse
-import json
 import sys
 from collections import Counter, defaultdict
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
+from meeting_utils import find_meetings, group_recurring_blockers, parse_month, parse_week
 from okr_utils import (
     load_team_okr,
     iter_kr_with_release,
     releases_at_risk,
 )
 
-MEETINGS_DIR = Path(__file__).resolve().parent.parent / "meetings"
 REVIEWS_DIR = Path(__file__).resolve().parent.parent / "reviews"
-
-
-def load_json(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def find_meetings(team: str, date_from: date, date_to: date) -> list[dict]:
-    """Find all structured.json for a team within date range (inclusive)."""
-    results = []
-    for p in MEETINGS_DIR.rglob("structured.json"):
-        data = load_json(p)
-        if data.get("team") != team:
-            continue
-        meeting_date = date.fromisoformat(data["date"])
-        if date_from <= meeting_date <= date_to:
-            results.append({"path": p, "data": data, "date": meeting_date})
-    results.sort(key=lambda x: x["date"])
-    return results
-
-
-def parse_week(week_str: str) -> tuple[date, date]:
-    """Parse ISO week like '2026-W13' into (monday, sunday)."""
-    year, week = week_str.split("-W")
-    monday = date.fromisocalendar(int(year), int(week), 1)
-    sunday = monday + timedelta(days=6)
-    return monday, sunday
-
-
-def parse_month(month_str: str) -> tuple[date, date]:
-    """Parse month like '2026-03' into (first_day, last_day)."""
-    year, month = month_str.split("-")
-    first = date(int(year), int(month), 1)
-    if int(month) == 12:
-        last = date(int(year) + 1, 1, 1) - timedelta(days=1)
-    else:
-        last = date(int(year), int(month) + 1, 1) - timedelta(days=1)
-    return first, last
 
 
 def aggregate(meetings: list[dict]) -> dict:
@@ -73,7 +35,6 @@ def aggregate(meetings: list[dict]) -> dict:
     all_topics = Counter()
     all_offtopic = []
     participation = Counter()
-    blocker_by_date = defaultdict(list)
     jira_issues = {}
 
     for m in meetings:
@@ -94,7 +55,6 @@ def aggregate(meetings: list[dict]) -> dict:
                 all_done.append({"person": person, "item": item, "date": meeting_date})
             for b in upd.get("blockers", []):
                 all_blockers.append({"person": person, "blocker": b, "date": meeting_date})
-                blocker_by_date[b.lower()].append(meeting_date)
 
         for dec in d.get("decisions", []):
             all_decisions.append({"decision": dec, "date": meeting_date})
@@ -108,12 +68,9 @@ def aggregate(meetings: list[dict]) -> dict:
         for o in d.get("offtopic", []):
             all_offtopic.append({"item": o, "date": meeting_date})
 
-    # Find recurring blockers (appeared on 2+ different dates)
-    recurring_blockers = []
-    for text, dates in blocker_by_date.items():
-        unique_dates = sorted(set(dates))
-        if len(unique_dates) > 1:
-            recurring_blockers.append({"blocker": text, "dates": unique_dates})
+    # Recurring blockers: общий фаззи-матчер из meeting_utils — то же
+    # определение, что в insights и prepare_daily, чтобы цифры сходились
+    recurring_blockers = group_recurring_blockers(meetings)
 
     # Open/in-progress action items
     open_items = [ai for ai in all_action_items if ai.get("status") in ("open", "in_progress")]

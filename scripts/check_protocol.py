@@ -4,10 +4,12 @@ import json
 from pathlib import Path
 
 try:
-    from jsonschema import validate, ValidationError
+    from jsonschema import Draft202012Validator, FormatChecker
     HAS_JSONSCHEMA = True
 except ImportError:
     HAS_JSONSCHEMA = False
+
+from meeting_utils import fold, load_team_config, significant_tokens
 
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schemas" / "daily_meeting.schema.json"
 
@@ -17,31 +19,49 @@ def load_json(path: Path):
 
 
 def validate_schema(data: dict):
-    """Validate structured.json against JSON schema. Returns list of errors."""
+    """Validate structured.json against JSON schema.
+
+    Returns (errors, warnings). Отсутствие jsonschema — это проблема
+    окружения, а не данных, поэтому warning, а не блокирующая ошибка.
+    """
     if not HAS_JSONSCHEMA:
-        return ["jsonschema not installed — skip schema validation (pip install jsonschema)"]
+        return [], ["jsonschema not installed — schema validation skipped (pip install jsonschema)"]
     if not SCHEMA_PATH.exists():
-        return [f"Schema file not found: {SCHEMA_PATH}"]
+        return [], [f"Schema file not found, validation skipped: {SCHEMA_PATH}"]
     schema = load_json(SCHEMA_PATH)
+    # FormatChecker обязателен: без него format: "date" не проверяется вовсе
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
     errors = []
-    try:
-        validate(instance=data, schema=schema)
-    except ValidationError as e:
+    for e in sorted(validator.iter_errors(data), key=lambda e: list(e.absolute_path)):
         path = " → ".join(str(p) for p in e.absolute_path) if e.absolute_path else "(root)"
         errors.append(f"Schema violation at [{path}]: {e.message}")
-    return errors
+    return errors, []
 
 
-def check_rules(data: dict, raw_text: str = ""):
+def _participant_known_in_raw(person: str, raw_folded: str, team_config: dict | None) -> bool:
+    """Имя (или его alias из team.yaml) встречается в тексте транскрипции."""
+    candidates = [fold(person)]
+    if team_config:
+        for member in team_config.get("members", []):
+            if fold(member.get("name", "")) == fold(person):
+                candidates.extend(fold(a) for a in member.get("aliases") or [])
+                break
+    return any(c and c in raw_folded for c in candidates)
+
+
+def check_rules(data: dict, raw_text: str = "", team_config: dict | None = None):
     warnings = []
     errors = []
 
-    # Rule: WIP-limit <=2 tasks in progress per person (approx via todo length)
+    # Rule: todo>2 — приблизительный сигнал риска WIP-лимита (todo — это планы
+    # на день, а не доска In Progress; сверять с реальным WIP вручную)
     for upd in data.get("updates", []):
         person = upd.get("person", "<unknown>")
         todo_count = len(upd.get("todo", []) or [])
         if todo_count > 2:
-            warnings.append(f"WIP-limit risk: {person} has {todo_count} todo items (>2)")
+            warnings.append(
+                f"WIP-limit risk (approx, by todo count): {person} has {todo_count} todo items (>2)"
+            )
 
     # Rule: action items should have owner and due_date when possible
     for i, item in enumerate(data.get("action_items", []), start=1):
@@ -50,22 +70,22 @@ def check_rules(data: dict, raw_text: str = ""):
         if item.get("due_date") in (None, ""):
             warnings.append(f"Action item #{i} has no due_date: {item.get('task','<no-task>')}")
 
-    # Rule: blockers should have matching resolution in decisions/action items or "паркуем" in raw
+    # Rule: blockers should have matching resolution in decisions/action items,
+    # or be explicitly parked («паркуем») in a raw line related to the blocker
     blockers = []
     for upd in data.get("updates", []):
         blockers.extend(upd.get("blockers", []) or [])
 
-    decisions_blob = " ".join(data.get("decisions", [])).lower()
-    actions_blob = " ".join((ai.get("task", "") for ai in data.get("action_items", []))).lower()
-    raw_l = raw_text.lower()
+    decisions_blob = fold(" ".join(data.get("decisions", [])))
+    actions_blob = fold(" ".join(ai.get("task", "") for ai in data.get("action_items", [])))
+    parked_lines = [ln for ln in raw_text.splitlines() if "парк" in fold(ln)]
 
     for b in blockers:
-        b_l = str(b).lower()
-        parts = [t for t in b_l.replace('-', ' ').split() if len(t) >= 5]
-        overlap_decisions = sum(1 for t in parts if t in decisions_blob)
-        overlap_actions = sum(1 for t in parts if t in actions_blob)
-        covered = (overlap_decisions + overlap_actions) >= 1
-        parked = "паркуем" in raw_l
+        b_tokens = significant_tokens(b)
+        covered = any(t in decisions_blob or t in actions_blob for t in b_tokens)
+        parked = any(
+            significant_tokens(ln) & b_tokens for ln in parked_lines
+        )
         if not covered and not parked:
             warnings.append(f"Blocker may be unresolved: {b}")
 
@@ -84,11 +104,13 @@ def check_rules(data: dict, raw_text: str = ""):
                 f"{item.get('task', '<no-task>')}"
             )
 
-    # Rule: participant not mentioned in raw.md (possible ghost participant)
+    # Rule: participant not mentioned in raw.md (possible ghost participant).
+    # Имена сравниваются с ё→е, учитываются aliases из team.yaml → members —
+    # иначе нормализация имён («Ваня» → «Иван») давала бы ложные срабатывания.
     if raw_text:
-        raw_lower = raw_text.lower()
+        raw_folded = fold(raw_text)
         for p in data.get("participants", []):
-            if p.lower() not in raw_lower:
+            if not _participant_known_in_raw(p, raw_folded, team_config):
                 warnings.append(f"Participant '{p}' not found in raw.md text")
 
     return errors, warnings
@@ -107,12 +129,13 @@ def main():
     if args.raw:
         raw_text = Path(args.raw).read_text(encoding="utf-8")
 
-    errors, warnings = check_rules(data, raw_text)
+    team_config = load_team_config(data.get("team", ""))
+    errors, warnings = check_rules(data, raw_text, team_config)
 
     # Schema validation (before business rules output)
-    schema_errors = validate_schema(data)
-    if schema_errors:
-        errors = schema_errors + errors
+    schema_errors, schema_warnings = validate_schema(data)
+    errors = schema_errors + errors
+    warnings = schema_warnings + warnings
 
     if errors:
         print("ERRORS:")

@@ -92,9 +92,19 @@ for target_line in "${TARGETS[@]}"; do
   target_abs="$PROJECT_DIR/$target_rel"
 
   if [ "$CLEAN" = true ]; then
+    # Удаляем только скиллы из docs/skills/ — в целевой директории могут
+    # лежать чужие скиллы пользователя, их не трогаем
     if [ -d "$target_abs" ]; then
-      rm -rf "$target_abs"
-      echo "CLEANED: $target_rel"
+      removed=0
+      for skill in "${SKILLS[@]}"; do
+        dst="$target_abs/$skill"
+        if [ -L "$dst" ] || [ -d "$dst" ]; then
+          rm -rf "$dst"
+          removed=$((removed + 1))
+        fi
+      done
+      rmdir "$target_abs" 2>/dev/null || true
+      echo "CLEANED: $target_rel ($removed skill(s))"
     fi
     continue
   fi
@@ -113,7 +123,7 @@ for target_line in "${TARGETS[@]}"; do
     fi
 
     if [ "$MODE" = "symlink" ]; then
-      rel_path=$(python3 -c "import os.path; print(os.path.relpath('$src', '$(dirname "$dst")'))")
+      rel_path=$(python3 -c 'import os.path, sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "$src" "$(dirname "$dst")")
       ln -s "$rel_path" "$dst"
       echo "  LINKED: $skill → $rel_path"
     else

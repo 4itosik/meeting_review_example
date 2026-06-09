@@ -9,27 +9,20 @@
     {
       "person": "Иван",
       "done": ["Сделал API"],
-      "todo": ["Доработать API"],
+      "todo": [],
       "blockers": ["Нет доступа к тестовому сервису"],
       "notes": []
     },
     {
       "person": "Мария",
       "done": ["Проверила макеты"],
-      "todo": ["Передать комментарии"],
+      "todo": [],
       "blockers": [],
       "notes": []
     }
   ],
   "decisions": ["Перенос релиза"],
-  "action_items": [
-    {
-      "task": "Выдать доступ к тестовому сервису Ивану",
-      "owner": null,
-      "status": "open",
-      "due_date": null
-    }
-  ],
+  "action_items": [],
   "topics": ["API", "Релиз"],
   "offtopic": []
 }

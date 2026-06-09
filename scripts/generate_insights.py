@@ -13,50 +13,21 @@ Usage:
  python3 scripts/generate_insights.py --team team-alpha --month 2026-03 --save
 """
 import argparse
-import json
 import sys
 from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
 
+from meeting_utils import (
+    find_meetings,
+    group_recurring_blockers,
+    parse_month,
+    parse_week,
+    significant_tokens,
+)
 from okr_utils import load_team_okr, releases_at_risk
 
-MEETINGS_DIR = Path(__file__).resolve().parent.parent / "meetings"
 REVIEWS_DIR = Path(__file__).resolve().parent.parent / "reviews"
-
-
-def load_json(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def find_meetings(team: str, date_from: date, date_to: date) -> list[dict]:
-    results = []
-    for p in MEETINGS_DIR.rglob("structured.json"):
-        data = load_json(p)
-        if data.get("team") != team:
-            continue
-        meeting_date = date.fromisoformat(data["date"])
-        if date_from <= meeting_date <= date_to:
-            results.append({"path": p, "data": data, "date": meeting_date})
-    results.sort(key=lambda x: x["date"])
-    return results
-
-
-def parse_week(week_str: str) -> tuple[date, date]:
-    year, week = week_str.split("-W")
-    monday = date.fromisocalendar(int(year), int(week), 1)
-    sunday = monday + timedelta(days=6)
-    return monday, sunday
-
-
-def parse_month(month_str: str) -> tuple[date, date]:
-    year, month = month_str.split("-")
-    first = date(int(year), int(month), 1)
-    if int(month) == 12:
-        last = date(int(year) + 1, 1, 1) - timedelta(days=1)
-    else:
-        last = date(int(year), int(month) + 1, 1) - timedelta(days=1)
-    return first, last
 
 
 def detect_overdue_items(meetings, ref_date):
@@ -77,35 +48,13 @@ def detect_overdue_items(meetings, ref_date):
     return overdue
 
 
-def detect_recurring_blockers(meetings):
-    history = {}
-    for m in meetings:
-        for upd in m["data"].get("updates", []):
-            for b in upd.get("blockers", []):
-                b_lower = b.lower()
-                matched_key = None
-                for key in history:
-                    common = set(key.split()) & set(b_lower.split())
-                    if len(common) >= 2:
-                        matched_key = key
-                        break
-                if matched_key:
-                    history[matched_key]["dates"].add(m["data"]["date"])
-                    history[matched_key]["persons"].add(upd["person"])
-                else:
-                    history[b_lower] = {
-                        "dates": {m["data"]["date"]},
-                        "persons": {upd["person"]},
-                        "text": b,
-                    }
-    return [
-        {"blocker": v["text"], "dates": sorted(v["dates"]), "persons": sorted(v["persons"])}
-        for v in history.values()
-        if len(v["dates"]) > 1
-    ]
+def detect_todo_overload(meetings):
+    """Сигнал перегрузки по числу планов на день (todo > 2).
 
-
-def detect_wip_overload(meetings):
+    Приблизительная эвристика: todo — это планы, а не доска In Progress,
+    поэтому созвоны и ревью тоже попадают в счёт. Реальный WIP сверяется
+    с доской вручную.
+    """
     overload_count = Counter()
     meeting_count = Counter()
     for m in meetings:
@@ -138,9 +87,10 @@ def detect_blocker_coverage(meetings):
         for upd in m["data"].get("updates", []):
             for b in upd.get("blockers", []):
                 total += 1
-                b_lower = b.lower()
-                parts = [t for t in b_lower.replace("-", " ").split() if len(t) >= 5]
-                if any(t in decisions_blob or t in actions_blob for t in parts):
+                if any(
+                    t in decisions_blob or t in actions_blob
+                    for t in significant_tokens(b)
+                ):
                     covered += 1
     return {"total": total, "covered": covered, "uncovered": total - covered}
 
@@ -250,7 +200,7 @@ def format_insights(team, period_label, date_from, date_to, meetings, okr=None):
         lines.append("→ Рекомендация: пересмотреть статус — закрыть, переназначить или обновить срок.")
         lines.append("")
 
-    recurring = detect_recurring_blockers(meetings)
+    recurring = group_recurring_blockers(meetings)
     if recurring:
         insights_found += 1
         lines.append(f"## Системные блокеры ({len(recurring)})")
@@ -263,17 +213,20 @@ def format_insights(team, period_label, date_from, date_to, meetings, okr=None):
         lines.append("→ Рекомендация: вынести в отдельное обсуждение. Повторяющийся блокер — признак системной проблемы.")
         lines.append("")
 
-    wip = detect_wip_overload(meetings)
-    if wip:
+    overload = detect_todo_overload(meetings)
+    if overload:
         insights_found += 1
-        lines.append("## WIP-перегрузка")
-        for w in wip:
+        lines.append("## Перегрузка планов (todo > 2)")
+        for w in overload:
             lines.append(
-                f"- {w['person']}: перегружен в {w['overloaded_meetings']}/{w['total_meetings']} "
+                f"- {w['person']}: больше 2 планов на день в {w['overloaded_meetings']}/{w['total_meetings']} "
                 f"дейликах ({w['pct']}%)"
             )
         lines.append("")
-        lines.append("→ Рекомендация: следить за WIP-лимитом (не более 2 задач In Progress). Перегрузка снижает throughput.")
+        lines.append(
+            "→ Рекомендация: приблизительный сигнал по числу планов на день (в счёт попадают и созвоны/ревью). "
+            "Сверить с доской: WIP-лимит — не более 2 задач In Progress."
+        )
         lines.append("")
 
     coverage = detect_blocker_coverage(meetings)
@@ -294,18 +247,26 @@ def format_insights(team, period_label, date_from, date_to, meetings, okr=None):
     trend = detect_done_trend(meetings)
     if len(trend) >= 2:
         insights_found += 1
-        lines.append("## Тренд velocity")
+        lines.append("## Тренд done-записей")
         for t in trend:
             bar = "█" * t["done"]
-            lines.append(f"- {t['date']}: {t['done']} задач {bar}")
-        first_half = sum(t["done"] for t in trend[: len(trend) // 2])
-        second_half = sum(t["done"] for t in trend[len(trend) // 2 :])
-        if second_half > first_half:
-            lines.append("→ Тренд: velocity растёт.")
-        elif second_half < first_half:
-            lines.append("→ Тренд: velocity падает. Возможные причины: блокеры, перегрузка, отвлечения.")
+            lines.append(f"- {t['date']}: {t['done']} записей {bar}")
+        # Сравнение половин периода осмысленно только от 4 митингов —
+        # на 2–3 точках это шум, а не тренд
+        if len(trend) >= 4:
+            first_half = sum(t["done"] for t in trend[: len(trend) // 2])
+            second_half = sum(t["done"] for t in trend[len(trend) // 2 :])
+            if second_half > first_half:
+                lines.append("→ Тренд: число закрытий растёт.")
+            elif second_half < first_half:
+                lines.append("→ Тренд: число закрытий падает. Возможные причины: блокеры, перегрузка, отвлечения.")
+            else:
+                lines.append("→ Тренд: стабильно.")
+            lines.append(
+                "(done-записи — упоминания результатов на дейликах, не story points; крупные задачи и мелкие правки весят одинаково)"
+            )
         else:
-            lines.append("→ Тренд: стабильно.")
+            lines.append("→ Для вывода о тренде мало данных (нужно ≥4 дейликов за период).")
         lines.append("")
 
     blocked = detect_most_blocked_persons(meetings)
@@ -329,7 +290,11 @@ def format_insights(team, period_label, date_from, date_to, meetings, okr=None):
                 f"- {c['owner']}: {c['done']}/{c['total']} закрыто ({c['pct']}%){marker}"
             )
         lines.append("")
-        lines.append("→ Рекомендация: «отставание» — закрыто <50% при ≥2 поручениях за период. Обсудить на 1-1 причины.")
+        lines.append(
+            "→ Рекомендация: «отставание» — закрыто <50% при ≥2 поручениях за период. "
+            "Метрика осмысленна, только если статусы поручений актуализируются "
+            "(шаг сверки в process-daily); прежде чем делать оргвыводы — проверить статусы."
+        )
         lines.append("")
 
     ghosts = detect_ghost_owners(meetings)

@@ -3,18 +3,17 @@
 Prepare daily standup briefing for the team lead.
 
 Collects context from previous meetings:
-- Open action items (not closed in subsequent meetings)
+- Open action items (status open/in_progress in structured.json)
 - Recurring blockers
 - Yesterday's plans (todo) per person
 - Speaking order rotation
-- Board status from last meeting
+- Last meeting summary
 - Team context: roles, OKR at risk, lead notes
 
 Usage:
  python3 scripts/prepare_daily.py --team team-alpha [--date 2026-03-31]
 """
 import argparse
-import json
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -25,82 +24,39 @@ try:
 except ImportError:
     HAS_YAML = False
 
+from meeting_utils import find_meetings, fold, group_recurring_blockers
 from okr_utils import releases_upcoming, releases_at_risk
 
-MEETINGS_DIR = Path(__file__).resolve().parent.parent / "meetings"
 TEAMS_DIR = Path(__file__).resolve().parent.parent / "teams"
 
 
-def find_meetings(team: str, before_date: date | None = None, limit: int = 10) -> list[dict]:
-    """Find structured.json files for a team, sorted by date desc."""
-    results = []
-    for p in MEETINGS_DIR.rglob("structured.json"):
-        data = json.loads(p.read_text(encoding="utf-8"))
-        if data.get("team") != team:
-            continue
-        meeting_date = date.fromisoformat(data["date"])
-        if before_date and meeting_date >= before_date:
-            continue
-        results.append({"path": p, "data": data, "date": meeting_date})
-    results.sort(key=lambda x: x["date"], reverse=True)
-    return results[:limit]
+def collect_open_action_items(meetings: list[dict], target_date: date) -> list[dict]:
+    """Поручения со статусом open/in_progress по прошлым митингам.
 
-
-def collect_open_action_items(meetings: list[dict]) -> list[dict]:
-    """Collect action items that are still open across all previous meetings."""
-    all_done_texts = set()
-    for m in meetings:
-        for upd in m["data"].get("updates", []):
-            for done_item in upd.get("done", []):
-                all_done_texts.add(done_item.lower())
-
+    Статусы поддерживаются скиллом process-daily (шаг сверки поручений):
+    когда выполнение подтверждено на новом дейлике, status в structured.json
+    исходного митинга обновляется на done/dropped. Дедупликация — по тексту
+    задачи, приоритет у самого свежего упоминания (meetings идут от новых
+    к старым), поэтому закрытая позже копия гасит старую открытую.
+    """
     open_items = []
     seen_tasks = set()
     for m in meetings:
         for ai in m["data"].get("action_items", []):
-            if ai["status"] in ("done", "dropped"):
-                continue
-            task_key = ai["task"].lower()
+            task_key = fold(ai["task"])
             if task_key in seen_tasks:
                 continue
             seen_tasks.add(task_key)
-            resolved = any(
-                task_key in done_text or done_text in task_key
-                for done_text in all_done_texts
-            )
-            if not resolved:
-                open_items.append({
-                    "task": ai["task"],
-                    "owner": ai.get("owner"),
-                    "due_date": ai.get("due_date"),
-                    "created": m["data"]["date"],
-                    "age_days": (date.today() - m["date"]).days,
-                })
+            if ai["status"] in ("done", "dropped"):
+                continue
+            open_items.append({
+                "task": ai["task"],
+                "owner": ai.get("owner"),
+                "due_date": ai.get("due_date"),
+                "created": m["data"]["date"],
+                "age_days": (target_date - m["date"]).days,
+            })
     return open_items
-
-
-def collect_recurring_blockers(meetings: list[dict]) -> list[dict]:
-    """Find blockers that appear in multiple meetings."""
-    blocker_history: dict[str, list[str]] = {}
-    for m in meetings:
-        for upd in m["data"].get("updates", []):
-            for b in upd.get("blockers", []):
-                b_lower = b.lower()
-                matched = False
-                for key in blocker_history:
-                    common = set(key.split()) & set(b_lower.split())
-                    if len(common) >= 2:
-                        blocker_history[key].append(m["data"]["date"])
-                        matched = True
-                        break
-                if not matched:
-                    blocker_history[b_lower] = [m["data"]["date"]]
-
-    recurring = []
-    for text, dates in blocker_history.items():
-        if len(dates) > 1:
-            recurring.append({"blocker": text, "dates": sorted(set(dates))})
-    return recurring
 
 
 def get_yesterday_plans(meetings: list[dict]) -> list[dict]:
@@ -115,27 +71,33 @@ def get_yesterday_plans(meetings: list[dict]) -> list[dict]:
     return plans
 
 
-def get_board_status(meetings: list[dict]) -> str | None:
-    """Extract board status numbers from last meeting's summary or raw."""
+def get_last_summary(meetings: list[dict]) -> str | None:
+    """Summary последнего митинга — контекст для открытия дейлика."""
     if not meetings:
         return None
     return meetings[0]["data"].get("summary", "")
 
 
-def get_speaking_order(meetings: list[dict], participants: list[str]) -> list[str]:
-    """Rotate speaking order based on previous meeting count."""
-    if not participants:
+def get_speaking_order(
+    target_date: date,
+    team_ctx: dict | None,
+    last_participants: list[str],
+) -> list[str]:
+    """Порядок выступлений: ротация по дате, лид — последним.
+
+    Сдвиг считается от календарной даты, а не от числа просканированных
+    митингов, поэтому очередь сдвигается каждый день независимо от --history.
+    Состав и лид берутся из team.yaml (по регламенту лид говорит последним);
+    fallback — участники последнего дейлика.
+    """
+    config = (team_ctx or {}).get("config") or {}
+    members = [m["name"] for m in config.get("members", [])] or list(last_participants)
+    if not members:
         return []
-    n = len(meetings)
-    if not meetings:
-        return participants
-    last_participants = meetings[0]["data"].get("participants", participants)
-    if not last_participants:
-        return participants
-    lead = last_participants[0]
-    others = [p for p in last_participants if p != lead]
+    lead = config.get("lead") or members[0]
+    others = [p for p in members if p != lead]
     if others:
-        shift = n % len(others)
+        shift = target_date.toordinal() % len(others)
         others = others[shift:] + others[:shift]
     return others + [lead]
 
@@ -378,30 +340,19 @@ def main():
     # Load team context (roles, OKR, notes)
     team_ctx = load_team_context(args.team)
 
-    meetings = find_meetings(args.team, before_date=target_date, limit=args.history)
-    if not meetings:
-        if team_ctx:
-            briefing = format_briefing(
-                team=args.team,
-                target_date=target_date,
-                open_items=[],
-                recurring_blockers=[],
-                plans=[],
-                last_summary=None,
-                speaking_order=[],
-                team_ctx=team_ctx,
-            )
-            print(briefing)
-        else:
-            print(f"No previous meetings found for {args.team} before {target_date}")
+    meetings = find_meetings(
+        args.team, before=target_date, limit=args.history, newest_first=True
+    )
+    if not meetings and not team_ctx:
+        print(f"No previous meetings found for {args.team} before {target_date}")
         sys.exit(0)
 
-    open_items = collect_open_action_items(meetings)
-    recurring_blockers = collect_recurring_blockers(meetings)
+    open_items = collect_open_action_items(meetings, target_date)
+    recurring_blockers = group_recurring_blockers(meetings)
     plans = get_yesterday_plans(meetings)
-    last_summary = get_board_status(meetings)
-    participants = meetings[0]["data"].get("participants", [])
-    speaking_order = get_speaking_order(meetings, participants)
+    last_summary = get_last_summary(meetings)
+    last_participants = meetings[0]["data"].get("participants", []) if meetings else []
+    speaking_order = get_speaking_order(target_date, team_ctx, last_participants)
 
     briefing = format_briefing(
         team=args.team,

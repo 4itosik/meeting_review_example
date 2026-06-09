@@ -48,17 +48,69 @@
   "action_items": [
     {
       "task": "Починить тестовый стенд",
-      "owner": "Олег",
+      "owner": null,
       "status": "open",
       "due_date": "2026-03-28"
-    },
-    {
-      "task": "Получить ответ от дизайнера по цветовой схеме",
-      "owner": "Артем",
-      "status": "open",
-      "due_date": null
     }
   ],
   "topics": ["Релиз", "UI", "Тестирование"],
-  "offtopic": []
+  "offtopic": [],
+  "jira_issues": [
+    {
+      "key": "TASK-230",
+      "summary": "UI макеты отчётов",
+      "status": "In Review",
+      "assignee": "Мария",
+      "mentioned_as": "TASK-230"
+    },
+    {
+      "key": "TASK-233",
+      "summary": "UI статусов оплаты",
+      "status": "To Do",
+      "assignee": "Мария",
+      "mentioned_as": "TASK-233"
+    },
+    {
+      "key": "TASK-235",
+      "summary": "Вебхуки: retry logic",
+      "status": "Done",
+      "assignee": "Иван",
+      "mentioned_as": "TASK-235"
+    },
+    {
+      "key": "TASK-236",
+      "summary": "Индексы БД для billing",
+      "status": "Done",
+      "assignee": "Петр",
+      "mentioned_as": "TASK-236"
+    },
+    {
+      "key": "TASK-238",
+      "summary": "Миграции billing",
+      "status": "To Do",
+      "assignee": "Петр",
+      "mentioned_as": "TASK-238"
+    },
+    {
+      "key": "TASK-240",
+      "summary": "Smoke-тесты релизного контура",
+      "status": "Done",
+      "assignee": "Алина",
+      "mentioned_as": "TASK-240"
+    },
+    {
+      "key": "TASK-241",
+      "summary": "Ретраи доставки вебхуков",
+      "status": "In Progress",
+      "assignee": "Иван",
+      "mentioned_as": "TASK-241"
+    },
+    {
+      "key": "TASK-245",
+      "summary": "E2E smoke",
+      "status": "To Do",
+      "assignee": "Алина",
+      "mentioned_as": "TASK-245"
+    }
+  ]
 }
